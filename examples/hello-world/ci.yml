@@ -1,0 +1,4 @@
+stages:
+  - name: example
+    steps:
+      - echo "hello world"

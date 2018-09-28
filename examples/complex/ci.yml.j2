@@ -1,0 +1,57 @@
+environment:
+  DOCKER_BUILDKIT: '1'
+
+options:
+  max_parallel_jobs: 4
+
+notifications:
+  slack:
+    channel: '#test'
+    webhook_url: ...
+
+stages:
+  - name: run tests and linting
+    env:
+      COMPOSE_PROJECT_NAME: myapp-{{ current_build.id }}
+    steps:
+      - docker-compose up --detatch
+      - docker build --tag myapp-test:{{ current_build.id }} --target=dev .
+      - run_in: docker
+        docker_image: myapp-test:{{ current_build.id }}
+        docker_args: --env-file=docker.env --network=host
+        steps:
+          - black --check *.py
+          - pylint --errors-only *.py
+          - pytest --cov myapp --cov-report xml --cov-report html
+        archive_files:
+          - coverage.xml
+          - htmlcov
+    steps_on_cleanup:
+      - docker-compose rm -fsv
+      - docker rmi -f myapp-test:{{ current_build.id }}
+
+  - end_if: test {{ git.branch }} != 'master'
+
+  - name: build and push production image
+    steps:
+      - docker build --tag {{ docker_registry_url }}/myapp:{{ current_build.id }} .
+      - docker push {{ docker_registry_url }}/myapp:{{ current_build.id }}
+
+  - name: deploy to test environment
+    run_in: ssh
+    ssh_host: test.myapp.mywork.com
+    steps:
+      - deploy-docker-container.sh {{ current_build.id }}
+      - run-smoke-tests.sh
+    max_parallel_jobs: 1
+
+  - name: deploy to production environment
+    run_in: ssh
+    ssh_host: prod.myapp.mywork.com
+    steps:
+      - deploy-docker-container.sh {{ current_build.id }}
+      - run-smoke-tests.sh
+    steps_on_failure:
+      - deploy-docker-container.sh {{ previous_successful_build.id }}
+    notify: true
+    max_parallel_jobs: 1
