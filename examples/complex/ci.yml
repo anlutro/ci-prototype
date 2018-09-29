@@ -1,3 +1,10 @@
+git:
+  branches:
+    - master
+    - release-*
+  tags: true
+  pull_requests: true
+
 defaults:
   environment:
     DOCKER_BUILDKIT: '1'
@@ -8,15 +15,15 @@ notifications:
     channel: '#test'
     webhook_url: ...
 
-stages:
+steps:
   - name: run tests and linting
     environment:
-      COMPOSE_PROJECT_NAME: myapp-$CURRENT_BUILD_ID
+      COMPOSE_PROJECT_NAME: myapp-$CURRENT_JOB_ID
     steps:
       - docker-compose up --detatch
-      - docker build --tag myapp-test:$CURRENT_BUILD_ID --target=dev .
+      - docker build --tag myapp-test:$CURRENT_JOB_ID --target=dev .
       - run_in: docker
-        docker_image: myapp-test:$CURRENT_BUILD_ID
+        docker_image: myapp-test:$CURRENT_JOB_ID
         docker_args: --env-file=docker.env --network=host
         steps:
           - black --check *.py
@@ -27,20 +34,20 @@ stages:
           - htmlcov
     steps_on_cleanup:
       - docker-compose rm -fsv
-      - docker rmi -f myapp-test:$CURRENT_BUILD_ID
+      - docker rmi -f myapp-test:$CURRENT_JOB_ID
 
   - end_if: test $GIT_BRANCH != 'master'
 
   - name: build and push production image
     steps:
-      - docker build --tag $DOCKER_REGISTRY_URL/myapp:$CURRENT_BUILD_ID .
-      - docker push $DOCKER_REGISTRY_URL/myapp:$CURRENT_BUILD_ID
+      - docker build --tag $DOCKER_REGISTRY_URL/myapp:$CURRENT_JOB_ID .
+      - docker push $DOCKER_REGISTRY_URL/myapp:$CURRENT_JOB_ID
 
   - name: deploy to test environment
     run_in: ssh
     ssh_host: test.myapp.mywork.com
     steps:
-      - deploy-docker-container.sh $CURRENT_BUILD_ID
+      - deploy-docker-container.sh $CURRENT_JOB_ID
       - run-smoke-tests.sh
     max_parallel_jobs: 1
 
@@ -48,9 +55,9 @@ stages:
     run_in: ssh
     ssh_host: prod.myapp.mywork.com
     steps:
-      - deploy-docker-container.sh $CURRENT_BUILD_ID
+      - deploy-docker-container.sh $CURRENT_JOB_ID
       - run-smoke-tests.sh
     steps_on_failure:
-      - deploy-docker-container.sh $PREVIOUS_SUCCESSFUL_BUILD_ID
+      - deploy-docker-container.sh $PREVIOUS_SUCCESSFUL_JOB_ID
     notify: true
     max_parallel_jobs: 1
