@@ -1,7 +1,6 @@
-environment:
-  DOCKER_BUILDKIT: '1'
-
-options:
+defaults:
+  environment:
+    DOCKER_BUILDKIT: '1'
   max_parallel_jobs: 4
 
 notifications:
@@ -11,13 +10,13 @@ notifications:
 
 stages:
   - name: run tests and linting
-    env:
-      COMPOSE_PROJECT_NAME: myapp-{{ current_build.id }}
+    environment:
+      COMPOSE_PROJECT_NAME: myapp-$CURRENT_BUILD_ID
     steps:
       - docker-compose up --detatch
-      - docker build --tag myapp-test:{{ current_build.id }} --target=dev .
+      - docker build --tag myapp-test:$CURRENT_BUILD_ID --target=dev .
       - run_in: docker
-        docker_image: myapp-test:{{ current_build.id }}
+        docker_image: myapp-test:$CURRENT_BUILD_ID
         docker_args: --env-file=docker.env --network=host
         steps:
           - black --check *.py
@@ -28,20 +27,20 @@ stages:
           - htmlcov
     steps_on_cleanup:
       - docker-compose rm -fsv
-      - docker rmi -f myapp-test:{{ current_build.id }}
+      - docker rmi -f myapp-test:$CURRENT_BUILD_ID
 
-  - end_if: test {{ git.branch }} != 'master'
+  - end_if: test $GIT_BRANCH != 'master'
 
   - name: build and push production image
     steps:
-      - docker build --tag {{ docker_registry_url }}/myapp:{{ current_build.id }} .
-      - docker push {{ docker_registry_url }}/myapp:{{ current_build.id }}
+      - docker build --tag $DOCKER_REGISTRY_URL/myapp:$CURRENT_BUILD_ID .
+      - docker push $DOCKER_REGISTRY_URL/myapp:$CURRENT_BUILD_ID
 
   - name: deploy to test environment
     run_in: ssh
     ssh_host: test.myapp.mywork.com
     steps:
-      - deploy-docker-container.sh {{ current_build.id }}
+      - deploy-docker-container.sh $CURRENT_BUILD_ID
       - run-smoke-tests.sh
     max_parallel_jobs: 1
 
@@ -49,9 +48,9 @@ stages:
     run_in: ssh
     ssh_host: prod.myapp.mywork.com
     steps:
-      - deploy-docker-container.sh {{ current_build.id }}
+      - deploy-docker-container.sh $CURRENT_BUILD_ID
       - run-smoke-tests.sh
     steps_on_failure:
-      - deploy-docker-container.sh {{ previous_successful_build.id }}
+      - deploy-docker-container.sh $PREVIOUS_SUCCESSFUL_BUILD_ID
     notify: true
     max_parallel_jobs: 1
