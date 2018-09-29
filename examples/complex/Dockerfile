@@ -1,9 +1,16 @@
 FROM python:3.7-slim-stretch AS build
-RUN python3 -m venv /venv
-RUN /venv/bin/pip install -e . -r requirements.txt
+RUN python3 -m venv /venv && /venv/bin/pip install -U pip setuptools
+RUN mkdir -p /app
+ADD requirements.txt /app
+RUN /venv/bin/pip install -r /app/requirements.txt
+ADD . /app
+WORKDIR /app
+RUN /venv/bin/pip install /app
 
 FROM build AS dev
-RUN /venv/bin/pip install -r requirements-dev.txt
+ADD requirements-dev.txt ./
+RUN /venv/bin/pip install -r /app/requirements-dev.txt
 
 FROM build AS prod
+COPY --from=build /venv /venv
 CMD /venv/bin/python -m myapp
