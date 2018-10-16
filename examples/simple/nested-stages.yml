@@ -1,0 +1,12 @@
+defaults:
+  environment:
+    EXAMPLE: default
+
+stages:
+  - name: initial step
+    steps:
+      - echo $EXAMPLE
+      - environment:
+          EXAMPLE: overridden
+        steps:
+          - echo $EXAMPLE
