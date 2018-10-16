@@ -13,4 +13,5 @@ RUN /venv/bin/pip install -r /app/requirements-dev.txt
 
 FROM build AS prod
 COPY --from=build /venv /venv
+EXPOSE 5000
 CMD /venv/bin/python -m myapp

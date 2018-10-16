@@ -12,10 +12,10 @@ app = Flask(__name__)
 def test_postgres():
     p = urlparse(os.environ["DB_URL"])
     kwargs = dict(
-        database=p.path[1:],
-        hostname=p.hostname,
+        database=p.path.lstrip("/"),
+        host=p.hostname,
         password=p.password,
-        username=p.username,
+        user=p.username,
     )
     if p.port:
         kwargs["port"] = p.port
@@ -29,8 +29,8 @@ def test_redis():
     kwargs = dict(host=p.hostname, db=p.path[1:])
     if p.port:
         kwargs["port"] = p.port
-    with redis.Redis(**kwargs) as conn:
-        conn.ping()
+    conn = redis.Redis(**kwargs)
+    conn.ping()
 
 
 def hello_world():
@@ -45,4 +45,4 @@ def hello():
 
 
 if __name__ == "__main__":
-    app.run('0.0.0.0')
+    app.run("0.0.0.0")
